@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -169,3 +170,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+=======
+.workspace
+NON-UPLOAD/
+>>>>>>> 5e3a57c (INITIAL COMMIT text classification 18-01-2024)

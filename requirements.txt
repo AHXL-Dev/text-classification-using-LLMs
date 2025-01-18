@@ -1,0 +1,7 @@
+pandas
+python-dotenv
+ollama
+openai
+streamlit
+asyncio
+instructor
