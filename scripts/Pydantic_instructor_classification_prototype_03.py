@@ -1,13 +1,3 @@
-# Install required Python dependencies
-pip install -r requirements.txt
-
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Start Ollama in the background
-ollama serve & ollama pull llama3.1:8b
-
-
 import asyncio
 from typing import List, Literal
 from pydantic import BaseModel, Field
