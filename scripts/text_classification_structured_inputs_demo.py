@@ -19,10 +19,10 @@ logging.basicConfig(level=logging.INFO)
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 
-#API_KEY = os.getenv("API_KEY")
+API_KEY = os.getenv("API_KEY")
 
-MODEL_NAME = "mistral:latest"
-#MODEL_NAME = "meta-llama/llama-3.3-70b-instruct:free"
+#MODEL_NAME = "mistral:latest"
+MODEL_NAME = "mistralai/mistral-small-24b-instruct-2501:free"
 
 LABELS = Literal['TIME_WAITING', 'POLICY', 'SERVICE_PROCESS', 
                 'QUALITY_OF_RESOLUTION', 'SELF_HELP_RESOURCES','AGENT_MANNERS', 
@@ -272,10 +272,10 @@ class SimplifiedBatchProcessor:
         self.batch_size = batch_size
         self.client = instructor.patch(
             AsyncOpenAI(
-                #base_url="https://openrouter.ai/api/v1",
-                #api_key=API_KEY
-                base_url="http://localhost:11434/v1",
-                api_key="ollama"
+                base_url="https://openrouter.ai/api/v1",
+                api_key=API_KEY
+                #base_url="http://localhost:11434/v1",
+                #api_key="ollama"
             ),
             mode=instructor.Mode.JSON
         )
