@@ -273,7 +273,7 @@ class SimplifiedBatchProcessor:
         self.client = instructor.patch(
             AsyncOpenAI(
                 base_url="https://openrouter.ai/api/v1",
-                api_key=API_KEY
+                api_key=st.secrets["openrouter_key"]["api_key"]
                 #base_url="http://localhost:11434/v1",
                 #api_key="ollama"
             ),
