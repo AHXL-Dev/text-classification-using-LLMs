@@ -7,6 +7,9 @@ __pycache__/
 # C extensions
 *.so
 
+#Streamlit YOML
+.streamlit/
+
 # Distribution / packaging
 .Python
 build/
@@ -61,6 +64,9 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+
+#DotEnv config
+.env
 
 # Flask stuff:
 instance/
