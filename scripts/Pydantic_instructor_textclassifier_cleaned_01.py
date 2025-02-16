@@ -19,10 +19,10 @@ logging.basicConfig(level=logging.INFO)
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 
-#API_KEY = os.getenv("API_KEY")
+API_KEY = os.getenv("API_KEY")
 
 MODEL_NAME = "mistral:latest"
-#MODEL_NAME = "meta-llama/llama-3.3-70b-instruct:free"
+#MODEL_NAME = "mistralai/mistral-small-24b-instruct-2501:free"
 
 LABELS = Literal['TIME_WAITING', 'POLICY', 'SERVICE_PROCESS', 
                 'QUALITY_OF_RESOLUTION', 'SELF_HELP_RESOURCES','AGENT_MANNERS', 
@@ -273,7 +273,7 @@ class SimplifiedBatchProcessor:
         self.client = instructor.patch(
             AsyncOpenAI(
                 #base_url="https://openrouter.ai/api/v1",
-                #api_key=API_KEY
+                #api_key=st.secrets["openrouter"]["api_key"]
                 base_url="http://localhost:11434/v1",
                 api_key="ollama"
             ),
@@ -376,6 +376,8 @@ def format_category_name(Category: str) -> str:
     formatted = ''.join(c for c in Category if c.isalnum() or c.isspace())
     return formatted.upper().replace(' ', '_')
 
+
+
 def create_streamlit_app():
     st.set_page_config(layout="wide")
     
@@ -455,15 +457,11 @@ def create_streamlit_app():
                 
                 async def analyze_ticket(ticket: Dict[str, Any], search_criteria: str) -> Dict[str, Any]:
                     prompt = f"""
-                    Analyze if this ticket matches the search criteria.
-
-                    SEARCH CRITERIA: {search_criteria}
-                    EXAMPLE PHRASES: {example_phrases if example_phrases else 'None provided'}
-
-                    TICKET INFORMATION:
-                    Problem: {ticket['ProblemDescription']}
-                    Resolution: {ticket['Resolution']}
-                    Feedback: {ticket['CustomerFeedback']}
+                    You are an expert in analyzing customer feedback related to support tickets.
+                    You are to operate as follows:
+                    1. Use the SEARCH CRITERIA: {search_criteria}.
+                    2. If provided use the EXAMPLE PHRASES: {example_phrases if example_phrases else 'None provided'}
+                    3. FOCUS on searching the {ticket['CustomerFeedback']} but use the Problem: {ticket['ProblemDescription']} and Resolution: {ticket['Resolution']} for context.
 
                     Consider:
                     1. Direct matches with search criteria
@@ -484,7 +482,7 @@ def create_streamlit_app():
                             {"role": "system", "content": "You are an expert at analyzing support tickets and identifying patterns in customer feedback."},
                             {"role": "user", "content": prompt}
                         ],
-                        temperature=0.3
+                        temperature=0.0
                     )
                     
                     return {
@@ -616,3 +614,5 @@ def create_streamlit_app():
 
 if __name__ == "__main__":
     create_streamlit_app()
+    
+
