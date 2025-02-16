@@ -13,7 +13,7 @@ import streamlit as st
 logging.basicConfig(level=logging.INFO)
 
 # Constants
-MODEL_NAME = "llama3.1:8b"
+MODEL_NAME = "mistral:latest"
 
 LABELS = Literal['TIME_WAITING', 'POLICY', 'PROCESS', 
                 'QUALITY_OF_RESOLUTION', 'SELF_HELP_RESOURCES', 'AGENT_BEHAVIOUR', 
