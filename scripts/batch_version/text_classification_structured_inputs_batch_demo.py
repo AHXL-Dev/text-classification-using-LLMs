@@ -6,41 +6,53 @@ import pandas as pd
 import instructor
 import logging
 import streamlit as st
-
+import os
+from dotenv import find_dotenv, load_dotenv
+ 
 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
+
 # Constants
-MODEL_NAME = "mistral:latest"
-#MODEL_NAME = "deepseek-r1:8b"
+dotenv_path = find_dotenv()
+load_dotenv(dotenv_path)
+
+API_KEY = os.getenv("API_KEY")
+
+#MODEL_NAME = "mistral:latest"
+MODEL_NAME = "mistralai/mistral-small-24b-instruct-2501:free"
 
 LABELS = Literal['TIME_WAITING', 'POLICY', 'SERVICE_PROCESS', 
                 'QUALITY_OF_RESOLUTION', 'SELF_HELP_RESOURCES','AGENT_MANNERS', 
                 'AGENT_KNOWLEDGE', 'TECHNOLOGY', 'REPEATED_FOLLOW_UP']
-CUSTOMER_SENTIMENT = Literal['ANGRY', 'FRUSTRATED', 'NEUTRAL', 'SATISFIED']
 
 # Category definitions
 CATEGORY_DEFINITIONS = {
-    'TIME_WAITING': 'Feedback related to long call waiting times, call queue lengths, or delays in receiving responses. This includes complaints about waiting for responses or resolution timeframes.',
+    'TIME_WAITING': 'Feedback that EXPLICITY mentions long call waiting times, call queue lengths, or delays in receiving responses. This includes complaints about waiting for responses or resolution timeframes.',
     
     'POLICY': 'Feedback related to company policies, rules, or standard procedures that affect service delivery. This includes cases where policies are unclear, seem unfair, or limit service options.',
     
     'SERVICE_PROCESS': 'Feedback related to how processes in services are delivered or tasks are completed. This includes difficult processes or complicated workflows.',
     
-    'QUALITY_OF_RESOLUTION': 'Feedback related to customer\'s problem not being resolved, it can be resolutions that are generic or incomplete.',
+    'QUALITY_OF_RESOLUTION': 'Feedback related to the customer\'s problem not being resolved, or answered. This also includes where the customer indicates the resolution was generic or incomplete.',
     
     'SELF_HELP_RESOURCES': 'Feedback related to QRG, website links, documentation, user guides, manuals, or other self-service materials. This includes unclear instructions, missing information, or difficult-to-use resources.',
     
-    'AGENT_MANNERS': 'Feedback related to agent\'s attitudes towards customers. This includes lack of empathy, being rude, abusive or abrupt.',
+    'AGENT_MANNERS': 'Feedback that EXPLICITLY mentions the agent\'s poor behavior towards customers. This includes specific mentions of rudeness, lack of empathy, being abrupt, dismissive, or any other unprofessional conduct. Do NOT apply this category for general complaints about resolution quality or service process.',
     
     'AGENT_KNOWLEDGE': 'Feedback related to the agent\'s expertise or understanding. This includes incorrect information, inability to explain clearly, or lack of technical knowledge.',
     
     'TECHNOLOGY': 'Feedback related to systems, software, or technical infrastructure. This includes system errors, software bugs, or lack of ease of use with digital tools.',
     
-    'REPEATED_FOLLOW_UP': 'Feedback related to ongoing communication or updates on existing requests. This includes lack of status updates, unclear next steps, or poor handling of ongoing cases.'
+    'REPEATED_FOLLOW_UP': 'Feedback that EXPLICITLY mentions the customer having to follow-up multiple times on a request.'
 }
+
+CATEGORY_PROMPT = "\n".join(
+    [f"- {cat}: {desc}" for cat, desc in CATEGORY_DEFINITIONS.items()]
+)
+
 
 
 def create_sample_data():
@@ -247,44 +259,23 @@ class TicketClassification(BaseModel):
     
     class Category(BaseModel):
         Category: List[LABELS] = Field(..., description='''
-            Analyze the ProblemDescription, Resolution and CustomerFeedback and select one or more labels that apply to categorise the feedback.
-            Consider these category definitions carefully:
-            
-            'TIME_WAITING': 'Feedback related to long call waiting times, call queue lengths, or delays in receiving responses. This includes complaints about waiting for responses or resolution timeframes.',
-            'POLICY': 'Feedback related to company policies, rules, or standard procedures that affect service delivery. This includes cases where policies are unclear, seem unfair, or limit service options.',
-            'SERVICE_PROCESS': 'Feedback related to how processes in services are delivered or tasks are completed. This includes difficult processes or complicated workflows.',
-            'QUALITY_OF_RESOLUTION': 'Feedback related to customer\'s problem not being resolved, it can be resolutions that are generic or incomplete.',
-            'SELF_HELP_RESOURCES': 'Feedback related to QRG, website links, documentation, user guides, manuals, or other self-service materials. This includes unclear instructions, missing information, or difficult-to-use resources.',
-            'AGENT_MANNERS': 'Feedback related to agent\'s attitudes towards customers. This includes lack of empathy, being rude, abusive or abrupt.',
-            'AGENT_KNOWLEDGE': 'Feedback related to the agent\'s expertise or understanding. This includes incorrect information, inability to explain clearly, or lack of technical knowledge.',
-            'TECHNOLOGY': 'Feedback related to systems, software, or technical infrastructure. This includes system errors, software bugs, or lack of ease of use with digital tools.',
-            'REPEATED_FOLLOW_UP': 'Feedback related to ongoing communication or updates on existing requests. This includes lack of status updates, unclear next steps, or poor handling of ongoing cases.'
-                
+            Analyze the CustomerFeedback and select one or more labels that apply to categorise the feedback. Use the ProblemDescription and Resolution to provide context.
             Choose categories that best match the customer's feedback about their experience.
         ''')
         justification: str = Field(..., description='Explain why you selected these categories, referencing specific aspects of the ticket.')
-        sentiment: CUSTOMER_SENTIMENT = Field(..., description='''
-            Determine the customer's emotional state based on their feedback:
-            ANGRY: Shows strong negative emotions, frustration, or dissatisfaction
-            FRUSTRATED: Shows mild to moderate negative emotions or disappointment
-            NEUTRAL: Shows neither strong positive nor negative emotions
-            SATISFIED: Shows positive emotions or satisfaction
-        ''')
+        sentiment: float = Field(ge=0, le=1, description='What is the degree of negative sentiment in the feedback (0-1)')
         confidence: float = Field(ge=0, le=1, description='How confident are you in this classification (0-1)')
         Row_ID: int
-
-    @classmethod
-    def get_category_definition(cls, Category: LABELS) -> str:
-        """Get the detailed definition for a category"""
-        return CATEGORY_DEFINITIONS.get(Category, "No definition available")
 
 class SimplifiedBatchProcessor:
     def __init__(self, batch_size: int = 5):
         self.batch_size = batch_size
         self.client = instructor.patch(
             AsyncOpenAI(
-                base_url="http://localhost:11434/v1",
-                api_key="ollama"
+                base_url="https://openrouter.ai/api/v1",
+                api_key=st.secrets["openrouter"]["api_key"]
+                #base_url="http://localhost:11434/v1",
+                #api_key="ollama"
             ),
             mode=instructor.Mode.JSON
         )
@@ -297,7 +288,7 @@ class SimplifiedBatchProcessor:
         for attempt in range(max_retries):
             try:
                 prompt = (
-                    f"Analyze this support ticket with attention to the specific roles and context of each field:\n\n"
+                    f"Analyze this support ticket and theme the CustomerFeedback. The Field structures are as follows:\n\n"
                     f"1. CUSTOMER'S INITIAL REQUEST:\n"
                     f"   {ticket['ProblemDescription']}\n"
                     f"   (This is what the customer initially asked for or needed help with)\n\n"
@@ -309,19 +300,11 @@ class SimplifiedBatchProcessor:
                     f"   (This is the customer's reaction to the support ticket, reflecting their satisfaction or dissatisfaction with the support experience, how they felt about the resolution, and any other comments regarding the service received)\n\n"
                     f"Ticket ID: {ticket['Row_ID']}\n\n"
                     f"Instructions for Classification:\n"
-                    f"1. Focus primarily on the CustomerFeedback as it is the primary driver of the classification\n"
-                    f"2. Compare the initial request (ProblemDescription) with the resolution provided\n"
-                    f"3. Evaluate if the agent's resolution (Resolution) appropriately addressed the customer's needs\n"
-                    f"4. Consider the gap between what was requested and what was delivered\n"
-                    f"5. Assess the customer's emotional response in their feedback\n\n"
-                    f"6. Provide classification that reflects one or more of the following categories that best describe the customer's feedback. If multiple categories apply, please list them all (separate categories with commas):\n\n"
-                    f"Provide classifications that reflects:\n"
-                    f"- How well the customer's needs were met\n"
-                    f"- Any gaps in service delivery\n"
-                    f"- The customer's emotional response\n"
-                    f"- The effectiveness of the resolution"
+                    f"1. FOCUS PRIMARILY ON THE CUSTOMERFEEDBACK AS IT IS THE PRIMARY DRIVER OF THE CLASSIFICATION\n"
+                    f"2. YOU MUST USE THE {CATEGORY_PROMPT} to guide your classification. CONSIDER THESE CAREFULLY AND ADHERE TO THE DEFINITIONS WHEN CLASSIFYING.\n" 
+                    f"3. Compare the initial request (ProblemDescription) with the resolution provided and USE THIS AS CONTEXT\n"
+                    f"4. Provide classification that reflects one or more of the following categories that best describe the customer's feedback. If multiple categories apply, please list them all (separate categories with commas):\n\n"
                 )
-                
                 response = await self.client.chat.completions.create(
                     model=MODEL_NAME,
                     response_model=TicketClassification.Category,
