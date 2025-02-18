@@ -8,7 +8,8 @@ import logging
 import streamlit as st
 import os
 from dotenv import find_dotenv, load_dotenv
- 
+import time
+import datetime
 
 
 # Configure logging
@@ -29,29 +30,18 @@ LABELS = Literal['TIME_WAITING', 'POLICY', 'SERVICE_PROCESS',
                 'AGENT_KNOWLEDGE', 'TECHNOLOGY', 'REPEATED_FOLLOW_UP']
 
 # Category definitions
-CATEGORY_DEFINITIONS = {
-    'TIME_WAITING': 'Feedback that EXPLICITY mentions long call waiting times, call queue lengths, or delays in receiving responses. This includes complaints about waiting for responses or resolution timeframes.',
-    
-    'POLICY': 'Feedback related to company policies, rules, or standard procedures that affect service delivery. This includes cases where policies are unclear, seem unfair, or limit service options.',
-    
-    'SERVICE_PROCESS': 'Feedback related to how processes in services are delivered or tasks are completed. This includes difficult processes or complicated workflows.',
-    
-    'QUALITY_OF_RESOLUTION': 'Feedback related to the customer\'s problem not being resolved, or answered. This also includes where the customer indicates the resolution was generic or incomplete.',
-    
-    'SELF_HELP_RESOURCES': 'Feedback related to QRG, website links, documentation, user guides, manuals, or other self-service materials. This includes unclear instructions, missing information, or difficult-to-use resources.',
-    
-    'AGENT_MANNERS': 'Feedback that EXPLICITLY mentions the agent\'s poor behavior towards customers. This includes specific mentions of rudeness, lack of empathy, being abrupt, dismissive, or any other unprofessional conduct. Do NOT apply this category for general complaints about resolution quality or service process.',
-    
-    'AGENT_KNOWLEDGE': 'Feedback related to the agent\'s expertise or understanding. This includes incorrect information, inability to explain clearly, or lack of technical knowledge.',
-    
-    'TECHNOLOGY': 'Feedback related to systems, software, or technical infrastructure. This includes system errors, software bugs, or lack of ease of use with digital tools.',
-    
-    'REPEATED_FOLLOW_UP': 'Feedback that EXPLICITLY mentions the customer having to follow-up multiple times on a request.'
-}
 
-CATEGORY_PROMPT = "\n".join(
-    [f"- {cat}: {desc}" for cat, desc in CATEGORY_DEFINITIONS.items()]
-)
+CATEGORY_DEFINITIONS = """
+    'TIME_WAITING': 'Feedback that EXPLICITY mentions long call waiting times, call queue lengths, or delays in receiving responses. This includes complaints about waiting for responses or resolution timeframes.'
+    'POLICY': 'Feedback related to company policies, rules, or standard procedures that affect service delivery. This includes cases where policies are unclear, seem unfair, or limit service options.'
+    'SERVICE_PROCESS': 'Feedback related to how processes in services are delivered or tasks are completed. This includes difficult processes or complicated workflows.'
+    'QUALITY_OF_RESOLUTION': 'Feedback related to the customer\'s problem not being resolved, or answered. This also includes where the customer indicates the resolution was generic or incomplete.'
+    'SELF_HELP_RESOURCES': 'Feedback related to QRG, website links, documentation, user guides, manuals, or other self-service materials. This includes unclear instructions, missing information, or difficult-to-use resources.'
+    'AGENT_MANNERS': 'Feedback that EXPLICITLY mentions the agent\'s poor behavior towards customers. This includes specific mentions of rudeness, lack of empathy, being abrupt, dismissive, or any other unprofessional conduct. Do NOT apply this category for general complaints about resolution quality or service process.'
+    'AGENT_KNOWLEDGE': 'Feedback related to the agent\'s expertise or understanding. This includes incorrect information, inability to explain clearly, or lack of technical knowledge.'
+    'TECHNOLOGY': 'Feedback related to systems, software, or technical infrastructure. This includes system errors, software bugs, or lack of ease of use with digital tools.'
+    'REPEATED_FOLLOW_UP': 'Feedback that EXPLICITLY mentions the customer having to follow-up multiple times on a request.'
+"""
 
 
 
@@ -301,7 +291,7 @@ class SimplifiedBatchProcessor:
                     f"Ticket ID: {ticket['Row_ID']}\n\n"
                     f"Instructions for Classification:\n"
                     f"1. FOCUS PRIMARILY ON THE CUSTOMERFEEDBACK AS IT IS THE PRIMARY DRIVER OF THE CLASSIFICATION\n"
-                    f"2. YOU MUST USE THE {CATEGORY_PROMPT} to guide your classification. CONSIDER THESE CAREFULLY AND ADHERE TO THE DEFINITIONS WHEN CLASSIFYING.\n" 
+                    f"2. YOU MUST USE THE {CATEGORY_DEFINITIONS} to guide your classification. CONSIDER THESE CAREFULLY AND ADHERE TO THE DEFINITIONS WHEN CLASSIFYING.\n" 
                     f"3. Compare the initial request (ProblemDescription) with the resolution provided and USE THIS AS CONTEXT\n"
                     f"4. Provide classification that reflects one or more of the following categories that best describe the customer's feedback. If multiple categories apply, please list them all (separate categories with commas):\n\n"
                 )
@@ -572,19 +562,20 @@ def create_streamlit_app():
         st.session_state.processor.batch_size = batch_size
         
         if st.button("Process Sample Tickets"):
+            process_start_time = time.time()
             try:
                 sample_data = create_sample_data()
                 results_tab, analysis_tab = st.tabs(["Results", "Analysis"])
                 
                 with st.spinner("Processing tickets..."):
                     loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
+                    asyncio.set_event_loop(loop) #need this for async setup, because streamlit runs sync by dewfault
                     try:
-                        results_df = loop.run_until_complete(
+                        results_df = loop.run_until_complete( #ensures active until all tickets processed
                             st.session_state.processor.process_all_tickets(sample_data)
-                        )
+                        ) 
                     finally:
-                        loop.close()
+                        loop.close() #closing the loop
                     
                     with results_tab:
                         st.dataframe(results_df, use_container_width=True)
@@ -611,7 +602,12 @@ def create_streamlit_app():
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
                 logging.error(f"Error in Streamlit app: {str(e)}", exc_info=True)
-
+            process_end_time = time.time()
+            process_duration = process_end_time - process_start_time
+            print(f"\nTicket processing completed")
+            print(f"Total execution time: {process_duration:.2f} seconds")
+            print(f"Successfully processed {len(results)} tickets")
+            print(f"Completed at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 if __name__ == "__main__":
     create_streamlit_app()
     
