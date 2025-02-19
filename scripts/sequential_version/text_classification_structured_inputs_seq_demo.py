@@ -7,6 +7,15 @@ from openai import OpenAI
 import instructor
 import time
 import datetime
+import os
+from dotenv import find_dotenv, load_dotenv
+
+
+
+#dotenv_path = find_dotenv()
+#load_dotenv(dotenv_path)
+
+#API_KEY = os.getenv("API_KEY")
 
 LABELS = Literal['TIME_WAITING', 'POLICY', 'SERVICE_PROCESS', 
                 'QUALITY_OF_RESOLUTION', 'SELF_HELP_RESOURCES','AGENT_MANNERS', 
@@ -275,7 +284,7 @@ def classify_ticket(ticket: Dict) -> TicketCategory:
     
     return st.session_state.client.chat.completions.create(
         #model="mistral:latest",
-        model = "mistralai/mistral-small-24b-instruct-2501:free"
+        model = "mistralai/mistral-small-24b-instruct-2501:free",
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
         response_model=TicketCategory  # Must confirm to our pydantic TicketCategory model
