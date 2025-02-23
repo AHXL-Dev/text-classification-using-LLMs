@@ -11,10 +11,10 @@ import logging
 
 
 logging.basicConfig(level=logging.INFO)
-dotenv_path = find_dotenv()
-load_dotenv(dotenv_path)
+#dotenv_path = find_dotenv()
+#load_dotenv(dotenv_path)
 
-API_KEY = os.getenv("API_KEY")
+#API_KEY = os.getenv("API_KEY")
 
 #MODEL_NAME = "mistral:latest"
 MODEL_NAME = "mistralai/mistral-small-24b-instruct-2501:free"
@@ -128,9 +128,10 @@ def initialize_client():
         st.session_state.client = instructor.patch(
             OpenAI(
                 base_url="https://openrouter.ai/api/v1",
-                api_key=API_KEY
+                #api_key=API_KEY
                 #base_url="http://localhost:11434/v1",
                 #api_key="ollama"
+                api_key=st.secrets["openrouter"]["api_key"]
             ),
             mode=instructor.Mode.JSON
         )
