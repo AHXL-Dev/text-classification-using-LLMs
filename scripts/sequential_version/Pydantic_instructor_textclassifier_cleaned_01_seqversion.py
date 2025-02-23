@@ -1,18 +1,29 @@
 import streamlit as st
 import pandas as pd
-import json
 from typing import List, Literal, Dict
 from pydantic import BaseModel, Field
 from openai import OpenAI
 import instructor
 import time
-import datetime
+import os
+from dotenv import find_dotenv, load_dotenv
+import logging
+
+
+logging.basicConfig(level=logging.INFO)
+dotenv_path = find_dotenv()
+load_dotenv(dotenv_path)
+
+API_KEY = os.getenv("API_KEY")
+
+#MODEL_NAME = "mistral:latest"
+MODEL_NAME = "mistralai/mistral-small-24b-instruct-2501:free"
 
 LABELS = Literal['TIME_WAITING', 'POLICY', 'SERVICE_PROCESS', 
                 'QUALITY_OF_RESOLUTION', 'SELF_HELP_RESOURCES','AGENT_MANNERS', 
                 'AGENT_KNOWLEDGE', 'TECHNOLOGY', 'REPEATED_FOLLOW_UP']
 
-
+# Category definitions
 
 CATEGORY_DEFINITIONS = """
     'TIME_WAITING': 'Feedback that EXPLICITY mentions long call waiting times, call queue lengths, or delays in receiving responses. This includes complaints about waiting for responses or resolution timeframes.'
@@ -89,208 +100,162 @@ def create_sample_data():
             "ProblemDescription": "I need help with changing my flight date.",
             "Resolution": "Here’s the link to change your booking online.",
             "CustomerFeedback": "The website process was unclear and I couldn’t change my flight."
-        },
-        {
-            "Row_ID": 11,
-            "ProblemDescription": "Can I get an update on my refund request?",
-            "Resolution": "There’s no update yet, but we’ll notify you soon.",
-            "CustomerFeedback": "No real update, just delays in communication."
-        },
-        {
-            "Row_ID": 12,
-            "ProblemDescription": "How do I submit my request for special assistance during the flight?",
-            "Resolution": "Refer to the assistance request page on our website.",
-            "CustomerFeedback": "The webpage wasn’t user-friendly, and I couldn’t submit my request."
-        },
-        {
-            "Row_ID": 13,
-            "ProblemDescription": "Why was my request for priority boarding denied?",
-            "Resolution": "Priority boarding is only available to premium passengers.",
-            "CustomerFeedback": "I wasn’t told about the eligibility criteria before."
-        },
-        {
-            "Row_ID": 14,
-            "ProblemDescription": "Can you explain why my checked bag was delayed?",
-            "Resolution": "Bag delays are often caused by high traffic during peak hours.",
-            "CustomerFeedback": "Agent didn’t explain the specific cause for my delayed luggage."
-        },
-        {
-            "Row_ID": 15,
-            "ProblemDescription": "How do I get a copy of my flight receipt?",
-            "Resolution": "You can download the receipt from the booking portal.",
-            "CustomerFeedback": "The receipt wasn’t available on the portal as mentioned."
-        },
-        {
-            "Row_ID": 16,
-            "ProblemDescription": "Why is my seat upgrade request taking longer than expected?",
-            "Resolution": "Upgrades are subject to availability and processing time.",
-            "CustomerFeedback": "Agent didn’t explain the exact reason for the delay."
-        },
-        {
-            "Row_ID": 17,
-            "ProblemDescription": "How can I get help with using the airline’s mobile app?",
-            "Resolution": "Please refer to the app user guide or attend our mobile app training session.",
-            "CustomerFeedback": "No immediate support, had to wait for a session."
-        },
-        {
-            "Row_ID": 18,
-            "ProblemDescription": "Why was my frequent flyer status downgraded?",
-            "Resolution": "Your status is based on recent travel activity, which may have decreased.",
-            "CustomerFeedback": "No explanation of the specific travel activity that caused the downgrade."
-        },
-        {
-            "Row_ID": 19,
-            "ProblemDescription": "I need assistance with claiming my frequent flyer miles.",
-            "Resolution": "Check the attached guide on how to claim miles from your recent flights.",
-            "CustomerFeedback": "The guide was unclear and didn’t help with my claim."
-        },
-        {
-            "Row_ID": 20,
-            "ProblemDescription": "Why is my baggage fee higher than usual?",
-            "Resolution": "Baggage fees are adjusted depending on flight routes and seasons.",
-            "CustomerFeedback": "Agent didn’t explain why my fee was higher for this specific flight."
-        },
-        {
-            "Row_ID": 21,
-            "ProblemDescription": "How do I update my credit card details for booking?",
-            "Resolution": "Update your card information through the booking portal.",
-            "CustomerFeedback": "The portal didn’t allow me to update my details, poor service."
-        },
-        {
-            "Row_ID": 22,
-            "ProblemDescription": "I need help understanding my flight charge breakdown.",
-            "Resolution": "Check the breakdown guide attached to your booking confirmation.",
-            "CustomerFeedback": "The breakdown didn’t explain the charges I was concerned about."
-        },
-        {
-            "Row_ID": 23,
-            "ProblemDescription": "Why is it taking so long to process my flight change request?",
-            "Resolution": "Flight changes depend on availability and schedule adjustments.",
-            "CustomerFeedback": "No solution was offered to speed up the processing time."
-        },
-        {
-            "Row_ID": 24,
-            "ProblemDescription": "Can I get assistance with canceling my flight?",
-            "Resolution": "Follow the cancellation steps outlined on our website.",
-            "CustomerFeedback": "The website instructions were confusing and didn’t work."
-        },
-        {
-            "Row_ID": 25,
-            "ProblemDescription": "How do I register for the airline's loyalty program?",
-            "Resolution": "Please visit our loyalty program registration page on the website.",
-            "CustomerFeedback": "The page was hard to find and took too long to navigate."
-        },
-        {
-            "Row_ID": 26,
-            "ProblemDescription": "Can I change my seat selection after booking?",
-            "Resolution": "You can modify seat selection through the booking portal.",
-            "CustomerFeedback": "The portal was not responsive, and I couldn’t change my seat."
-        },
-        {
-            "Row_ID": 27,
-            "ProblemDescription": "Why does it take so long to get customer support for flight queries?",
-            "Resolution": "Support is provided based on queue order and agent availability.",
-            "CustomerFeedback": "Unacceptable wait time and poor customer service."
-        },
-        {
-            "Row_ID": 28,
-            "ProblemDescription": "How can I escalate my complaint about flight delays?",
-            "Resolution": "Escalations are possible after 5 business days if not resolved.",
-            "CustomerFeedback": "I wasn’t given immediate escalation options, felt ignored."
-        },
-        {
-            "Row_ID": 29,
-            "ProblemDescription": "Why do I need to resubmit my claim for flight damage compensation?",
-            "Resolution": "Your previous claim was incomplete, please provide additional details.",
-            "CustomerFeedback": "I wasn’t told what was missing, causing unnecessary delays."
-        },
-        {
-            "Row_ID": 30,
-            "ProblemDescription": "I need clarification on the airline's policy for pet travel.",
-            "Resolution": "Please refer to the attached policy document for pet travel guidelines.",
-            "CustomerFeedback": "The policy document was too vague and didn’t answer my questions."
-        },
-        {
-            "Row_ID": 31,
-            "ProblemDescription": "I need help getting my delayed baggage back.",
-            "Resolution": "Your baggage is being tracked, and you will receive an update soon.",
-            "CustomerFeedback": "No one followed up with me and the agent was very rude about it."
-        },
-        {
-            "Row_ID": 32,
-            "ProblemDescription": "Why is my seat not assigned despite checking in?",
-            "Resolution": "Seats are assigned based on availability at check-in.",
-            "CustomerFeedback": "Agent was dismissive and said it’s ‘just the way it is.’"
-        }
-    ]
+        }]
     
     return sample_data
-
-
-class TicketCategory(BaseModel):
-    """Model for storing the classification results of a support ticket"""
-    Row_ID: int
-    categories: List[LABELS]
-    sentiment: float = Field(ge=0, le=1,description='What is the degree of negative sentiment in the feedback (0 is neutral, 1 is very negative)')
-    confidence: float = Field(ge=0, le=1,description='What is the degree of confidence in this classification (0 is very unconfident, 1 is very confident)')
-    justification: str = Field(..., description='Explain why you selected these categories, referencing specific aspects of the ticket.')
     
+
+class SearchAnalysis(BaseModel):
+    match: Literal['YES', 'NO'] = Field(..., description='Whether the ticket matches the search criteria')
+    confidence: float = Field(..., ge=0, le=1, description='How confident are you with the match? (0-1)')
+    reason: str = Field(..., description='Explanation for the match decision')
+    Row_ID: int
+    
+class TicketClassification(BaseModel):
+    '''Classification model for support tickets'''
+    
+    Category: List[LABELS] = Field(..., description='''
+        Analyze the CustomerFeedback and select one or more labels that apply to categorise the feedback. Use the ProblemDescription and Resolution to provide context.
+        Choose categories that best match the customer's feedback about their experience.
+    ''')
+    justification: str = Field(..., description='Explain why you selected these categories, referencing specific aspects of the ticket.')
+    sentiment: float = Field(ge=0, le=1, description='What is the degree of negative sentiment in the feedback (0-1)')
+    confidence: float = Field(ge=0, le=1, description='How confident are you in this classification (0-1)')
+    Row_ID: int
+
 def initialize_client():
-    """Initialize OpenAI client once and store in session state"""
     if 'client' not in st.session_state:
         st.session_state.client = instructor.patch(
             OpenAI(
-                #base_url="https://openrouter.ai/api/v1",
-                #api_key=st.secrets["openrouter"]["api_key"]
-                base_url="http://localhost:11434/v1",
-                api_key="ollama"
+                base_url="https://openrouter.ai/api/v1",
+                api_key=API_KEY
+                #base_url="http://localhost:11434/v1",
+                #api_key="ollama"
             ),
             mode=instructor.Mode.JSON
         )
+def classify_single_ticket(ticket: Dict) -> TicketClassification:
+        for attempt in range(3):
+            try:
+                prompt = (
+                f"Analyze this support ticket and theme the CustomerFeedback. The Field structures are as follows:\n\n"
+                f"1. CUSTOMER'S INITIAL REQUEST:\n"
+                f"   {ticket['ProblemDescription']}\n"
+                f"   (This is what the customer initially asked for or needed help with)\n\n"
+                f"2. AGENT'S RESOLUTION TO REQUEST:\n"
+                f"   {ticket['Resolution']}\n"
+                f"   (This is how the support agent attempted to resolve the request)\n\n"
+                f"3. CUSTOMER'S FEEDBACK:\n"
+                f"   {ticket['CustomerFeedback']}\n"
+                f"   (This is the customer's reaction to the support ticket, reflecting their satisfaction or dissatisfaction with the support experience, how they felt about the resolution, and any other comments regarding the service received)\n\n"
+                f"Ticket ID: {ticket['Row_ID']}\n\n"
+                f"Instructions for Classification:\n"
+                f"1. FOCUS PRIMARILY ON THE CUSTOMERFEEDBACK AS IT IS THE PRIMARY DRIVER OF THE CLASSIFICATION\n"
+                f"2. YOU MUST USE THE {CATEGORY_DEFINITIONS} to guide your classification. CONSIDER THESE CAREFULLY AND ADHERE TO THE DEFINITIONS WHEN CLASSIFYING.\n" 
+                f"3. Compare the initial request (ProblemDescription) with the resolution provided and USE THIS AS CONTEXT\n"
+                f"4. Provide classification that reflects one or more of the following categories that best describe the customer's feedback. If multiple categories apply, please list them all (separate categories with commas):\n\n"
+            )
+                result = st.session_state.client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                    response_model=TicketClassification
+                )
+                return result
+        
+            except Exception as e:
+                if attempt == 2:
+                    result = TicketClassification(
+                        Row_ID=ticket['Row_ID'],
+                        Category=[],
+                        sentiment=0,
+                        confidence=0,
+                        justification=f"Classification failed after 3 attempts: {str(e)}"
+                    )
+                    return result
 
-def classify_ticket(ticket: Dict) -> TicketCategory:
-    """
-    Classify a single support ticket using LLM
-    Returns structured classification data
-    """
-    # Create a clear prompt for the LLM
-    prompt = (
-        f"Analyze this support ticket and theme the CustomerFeedback. The Field structures are as follows:\n\n"
-        f"1. CUSTOMER'S INITIAL REQUEST:\n"
-        f" {ticket['ProblemDescription']}\n"
-        f" (This is what the customer initially asked for or needed help with)\n\n"
-        f"2. AGENT'S RESOLUTION TO REQUEST:\n"
-        f" {ticket['Resolution']}\n"
-        f" (This is how the support agent attempted to resolve the request)\n\n"
-        f"3. CUSTOMER'S FEEDBACK:\n"
-        f" {ticket['CustomerFeedback']}\n"
-        f" (This is the customer's reaction to the support ticket, reflecting their satisfaction or dissatisfaction with the support experience, how they felt about the resolution, and any other comments regarding the service received)\n\n"
-        f"Ticket ID: {ticket['Row_ID']}\n\n"
-        f"Instructions for Classification:\n"
-        f"1. FOCUS PRIMARILY ON THE CUSTOMERFEEDBACK AS IT IS THE PRIMARY DRIVER OF THE CLASSIFICATION\n"
-        f"2. YOU MUST USE THE {CATEGORY_DEFINITIONS} to guide your classification. CONSIDER THESE CAREFULLY AND ADHERE TO THE DEFINITIONS WHEN CLASSIFYING.\n" 
-        f"3. Compare the initial request (ProblemDescription) with the resolution provided and USE THIS AS CONTEXT\n"
-        f"4. Provide classification that reflects one or more of the following categories that best describe the customer's feedback. If multiple categories apply, please list them all (separate categories with commas):\n\n"
-    )
+            time.sleep(1)
+
+
+
+def analyze_ticket(ticket: Dict, search_criteria: str, example_phrases: str) -> SearchAnalysis:
+        for attempt in range(3):
+            try:
+                prompt = (f"""
+                        Analyze if this ticket matches the search criteria.
+
+                        SEARCH CRITERIA: {search_criteria}
+                        EXAMPLE PHRASES: {example_phrases if example_phrases else 'None provided'}
+
+                        TICKET INFORMATION:
+                        Ticket ID: {ticket['Row_ID']}
+                        Problem: {ticket['ProblemDescription']}
+                        Resolution: {ticket['Resolution']}
+                        Feedback: {ticket['CustomerFeedback']}
+
+                        Consider:
+                        1. Direct matches with search criteria
+                        2. Context from problem description and resolution
+                        3. Example phrases provided (if any)
+
+                        Provide your analysis in this format:
+                        MATCH: [YES/NO]
+                        CONFIDENCE: [0-100]
+                        REASON: [Brief explanation of why this matches or doesn't match]
+                        KEY_THEMES: [Main topics/issues identified]
+                        """)
+                result_custom = st.session_state.client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                    response_model=SearchAnalysis
+                )
+                print(result_custom)
+                return result_custom
+          
+            except Exception as e:
+                if attempt == 2: 
+                    result_custom = SearchAnalysis(
+                        match="NO",
+                        confidence=0.0,
+                        reason=f"Analysis failed: {str(e)}",
+                        Row_ID=ticket['Row_ID']
+                    )
+                    return result_custom
+            time.sleep(1) 
+
+
+            
+def process_tickets(all_tickets,number:int,search_criteria = "none", example_phrases = "none"):
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    classified_results = []
     
-    return st.session_state.client.chat.completions.create(
-        model="mistral:latest",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-        response_model=TicketCategory  
-    )
+    for i in all_tickets:
+        progress = i['Row_ID'] / len(all_tickets)
+        status_text.text(f"Processing ticket {i['Row_ID']}...")
+        progress_bar.progress(progress)
+        if number == 1:
+            classified_results.append(classify_single_ticket(i))
+        elif number == 2:
+            print(i)
+            print(search_criteria)
+            print(example_phrases)
+            classified_results.append(analyze_ticket(i, search_criteria, example_phrases))
+        
+    return classified_results
 
 def create_streamlit_app():
-    """Create the Streamlit interface"""
     st.set_page_config(layout="wide")
+    st.sidebar.header("Navigation")
+    page = st.sidebar.radio("Select Page", ["Introduction", "Process Tickets", "Search for theme"])
     initialize_client()
 
     if 'tickets' not in st.session_state:
         st.session_state.tickets = create_sample_data()
-
-
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Select Page", ["Introduction", "Process Tickets"])
+    tickets = st.session_state.tickets
+    st.title("Process Support Tickets")
+    st.subheader("This app is using a MOCK/fake dataset")
     if page == "Introduction":
         st.title("Text Classification using Large Language Models – Demonstration")
         st.markdown("*Created by Asanka*")
@@ -303,72 +268,86 @@ def create_streamlit_app():
         * I am currently hosting this on a particular platform. I have not created this app for production , **this is purely based on my interest and learning of Gen AI applications**
         * This is purely for demonstration, and there are further ways to enhance the program or use a stronger model.
         """)
-        
-        st.header("Classification Page")
-        st.markdown("""
-        This page showcases how the AI classifies customer support tickets using the **mock dataset**. The system automatically categorizes each ticket based on the customer's feedback, problem description, and agent's resolution.
-
-        The categories used in this classification are designed to reflect different aspects of customer service and feedback.  
-        This is a **fake dataset** with **30 number of rows** of mock tickets.
-
-        ### Categories Used in Classification:
-        - **TIME_WAITING**: Feedback about long wait times or delays.
-        - **POLICY**: Issues with company policies or procedures.
-        - **SERVICE_PROCESS**: Feedback on how services or tasks are delivered.
-        - **QUALITY_OF_RESOLUTION**: Effectiveness of the resolution provided.
-        - **SELF_HELP_RESOURCES**: Issues with self-help materials like guides or manuals.
-        - **AGENT_MANNERS**: Feedback on the agent’s demeanor or professionalism.
-        - **AGENT_KNOWLEDGE**: Issues with the agent’s knowledge or expertise.
-        - **TECHNOLOGY**: Feedback on the systems, tools, or technology used.
-        - **REPEATED_FOLLOW_UP**: Feedback about ongoing communication or lack of updates.
-        """)
-    else: 
-        st.title("Process Support Tickets")
-        st.subheader("This app is using a MOCK/fake dataset, this is NOT based on any real data, it is completely MADE UP")
+    elif page == "Process Tickets":
         if st.button("Process Sample Tickets"):
-            process_start_time = time.time()
-            tickets = st.session_state.tickets
-            results = []
-            progress_bar = st.progress(0)
-            for i, ticket in enumerate(tickets):
-                try:
-                    progress = (i + 1) / len(tickets)
-                    progress_bar.progress(progress)
-                    result = classify_ticket(ticket)
-                    results.append(result)
-                except Exception as e:
-                    st.error(f"Error processing ticket {ticket['Row_ID']}: {str(e)}")
+            start_time = time.time()
+            results = process_tickets(tickets,1)
+            results_df = pd.DataFrame([
+                {
+                    'Row_ID': r.Row_ID,
+                    'Categories': ', '.join(r.Category),
+                    'Sentiment': r.sentiment,
+                    'Confidence': r.confidence,
+                    'Justification': r.justification
+                }
+                for r in results
+            ])
             
-            if results:
-                results_df = pd.DataFrame([
-                    {
-                        'Row_ID': r.Row_ID,
-                        'Problem': tickets[i]['ProblemDescription'],
-                        'Resolution': tickets[i]['Resolution'],
-                        'Feedback': tickets[i]['CustomerFeedback'],
-                        'Categories': ', '.join(r.categories),
-                        'Sentiment': r.sentiment,
-                        'Confidence': r.confidence,
-                        'Justification': r.justification
-                    }
-                    for i, r in enumerate(results)
-                ])
+            tickets_df = pd.DataFrame(st.session_state.tickets)
+            final_df = pd.merge(
+                tickets_df[['Row_ID', 'ProblemDescription', 'Resolution', 'CustomerFeedback']],
+                results_df,
+                on='Row_ID',
+                how='inner'
+            )
             
-            process_end_time = time.time()
-            process_duration = process_end_time - process_start_time
-            print(f"\nTicket processing completed")
-            print(f"Total execution time: {process_duration:.2f} seconds")
-            print(f"Successfully processed {len(results)} out of {len(tickets)} tickets")
-            print(f"Completed at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            if final_df['Categories'].isnull().any():
+                st.button("Reprocess Sample Tickets", on_click="")
+            
+            
             st.subheader("Classification Results")
-            st.dataframe(results_df)
-            csv = results_df.to_csv(index=False)
+            st.dataframe(final_df)
+            csv = final_df.to_csv(index=False)
             st.download_button(
                 "Download Results",
                 csv,
                 "classification_results.csv",
                 "text/csv"
             )
+            
+            end_time = time.time()
+            st.success(f"Processed {len(results)} tickets in {end_time - start_time:.2f} seconds")
+   
+    elif page == "Search for theme":
+        st.title("Search for theme")
+        issue_description = st.text_area(
+                "What kind of feedback are you looking for?",
+                placeholder="Example: System being slow and unresponsive"
+            )
+
+        example_phrases = st.text_area(
+            "Optional: Add example phrases",
+            placeholder="Example phrases that customers might use"
+        )
+        if st.button("Search for theme") and issue_description:
+            start_time = time.time()
+            results2 = process_tickets(tickets,2,issue_description,example_phrases)
+            print(results2)
+            results2_df = pd.DataFrame([{
+                'Row_ID': r.Row_ID,
+                'Match': r.match,
+                'Confidence': r.confidence,
+                'Reason': r.reason,
+            } for r in results2])
+            print(results2)
+            tickets_df_2 = pd.DataFrame(st.session_state.tickets)
+            final_df_2 = pd.merge(
+                tickets_df_2[['Row_ID', 'ProblemDescription', 'Resolution', 'CustomerFeedback']],
+                results2_df,
+                on='Row_ID',
+                how='inner'
+            )
+            st.subheader("Classification Results")
+            st.dataframe(final_df_2)
+            csv = results2_df.to_csv(index=False)
+            st.download_button(
+                "Download Results",
+                csv,
+                "specific_search.csv",
+                "text/csv"
+            )
+            end_time = time.time()
+            st.success(f"Processed {len(results2)} tickets in {end_time - start_time:.2f} seconds")
 
 if __name__ == "__main__":
     create_streamlit_app()
