@@ -9,12 +9,18 @@ import os
 from dotenv import find_dotenv, load_dotenv
 import logging
 
-
 logging.basicConfig(level=logging.INFO)
-#dotenv_path = find_dotenv()
-#load_dotenv(dotenv_path)
 
-#API_KEY = os.getenv("API_KEY")
+
+
+
+if 'button_clicked' not in st.session_state:
+    st.session_state.button_clicked = False
+    
+def increment_counter():
+    st.session_state.usage_count += 1
+    st.session_state.button_clicked = True
+
 
 #MODEL_NAME = "mistral:latest"
 MODEL_NAME = "mistralai/mistral-small-24b-instruct-2501:free"
@@ -128,13 +134,14 @@ def initialize_client():
         st.session_state.client = instructor.patch(
             OpenAI(
                 base_url="https://openrouter.ai/api/v1",
-                #api_key=API_KEY
                 #base_url="http://localhost:11434/v1",
                 #api_key="ollama"
                 api_key=st.secrets["openrouter"]["api_key"]
             ),
-            mode=instructor.Mode.JSON
-        )
+            mode=instructor.Mode.JSON)
+    if 'usage_count' not in st.session_state:
+        st.session_state.usage_count = 0
+        
 def classify_single_ticket(ticket: Dict) -> TicketClassification:
         for attempt in range(3):
             try:
@@ -251,12 +258,24 @@ def create_streamlit_app():
     st.sidebar.header("Navigation")
     page = st.sidebar.radio("Select Page", ["Introduction", "Process Tickets", "Search for theme"])
     initialize_client()
+    
+
+    st.sidebar.divider()
+    st.sidebar.subheader("Usage Limit")
+    max_attempts = 2
+    remaining_attempts = max_attempts - st.session_state.usage_count
+    st.sidebar.write(f"Remaining attempts: {remaining_attempts}")
+    
+    if st.session_state.usage_count >= max_attempts:
+        st.sidebar.error("You have reached the maximum number of attempts for this session.")
 
     if 'tickets' not in st.session_state:
         st.session_state.tickets = create_sample_data()
     tickets = st.session_state.tickets
+    
     st.title("Process Support Tickets")
     st.subheader("This app is using a MOCK/fake dataset")
+
     if page == "Introduction":
         st.title("Text Classification using Large Language Models – Demonstration")
         st.markdown("*Created by Asanka*")
@@ -270,45 +289,56 @@ def create_streamlit_app():
         * This is purely for demonstration, and there are further ways to enhance the program or use a stronger model.
         """)
     elif page == "Process Tickets":
-        if st.button("Process Sample Tickets"):
-            start_time = time.time()
-            results = process_tickets(tickets,1)
-            results_df = pd.DataFrame([
-                {
-                    'Row_ID': r.Row_ID,
-                    'Categories': ', '.join(r.Category),
-                    'Sentiment': r.sentiment,
-                    'Confidence': r.confidence,
-                    'Justification': r.justification
-                }
-                for r in results
-            ])
-            
-            tickets_df = pd.DataFrame(st.session_state.tickets)
-            final_df = pd.merge(
-                tickets_df[['Row_ID', 'ProblemDescription', 'Resolution', 'CustomerFeedback']],
-                results_df,
-                on='Row_ID',
-                how='inner'
-            )
-            
-            if final_df['Categories'].isnull().any():
-                st.button("Reprocess Sample Tickets", on_click="")
-            
-            
-            st.subheader("Classification Results")
-            st.dataframe(final_df)
-            csv = final_df.to_csv(index=False)
-            st.download_button(
-                "Download Results",
-                csv,
-                "classification_results.csv",
-                "text/csv"
-            )
-            
-            end_time = time.time()
-            st.success(f"Processed {len(results)} tickets in {end_time - start_time:.2f} seconds")
-   
+
+        button_disabled = st.session_state.usage_count >= max_attempts
+        
+
+        if st.button("Process Sample Tickets", disabled=button_disabled, on_click=increment_counter):
+
+            if st.session_state.button_clicked:
+                st.session_state.button_clicked = False
+                
+                start_time = time.time()
+                results = process_tickets(tickets,1)
+                results_df = pd.DataFrame([
+                    {
+                        'Row_ID': r.Row_ID,
+                        'Categories': ', '.join(r.Category),
+                        'Sentiment': r.sentiment,
+                        'Confidence': r.confidence,
+                        'Justification': r.justification
+                    }
+                    for r in results
+                ])
+                tickets_df = pd.DataFrame(st.session_state.tickets)
+                final_df = pd.merge(
+                    tickets_df[['Row_ID', 'ProblemDescription', 'Resolution', 'CustomerFeedback']],
+                    results_df,
+                    on='Row_ID',
+                    how='inner'
+                )
+                
+                if final_df['Categories'].isnull().any():
+                    st.button("Reprocess Sample Tickets", on_click="")
+                
+                st.subheader("Classification Results")
+                st.dataframe(final_df)
+                csv = final_df.to_csv(index=False)
+                st.download_button(
+                    "Download Results",
+                    csv,
+                    "classification_results.csv",
+                    "text/csv"
+                )
+                end_time = time.time()
+                st.success(f"Processed {len(results)} tickets in {end_time - start_time:.2f} seconds")
+                
+
+        if st.session_state.usage_count >= max_attempts:
+                    st.error("You have reached the maximum number of attempts (2) for this session. Please refresh the page to start a new session.")
+        elif st.session_state.usage_count > 0:
+                    st.info(f"You have {remaining_attempts} attempt(s) remaining for this session.")
+                
     elif page == "Search for theme":
         st.title("Search for theme")
         issue_description = st.text_area(
@@ -320,35 +350,44 @@ def create_streamlit_app():
             "Optional: Add example phrases",
             placeholder="Example phrases that customers might use"
         )
-        if st.button("Search for theme") and issue_description:
-            start_time = time.time()
-            results2 = process_tickets(tickets,2,issue_description,example_phrases)
-            print(results2)
-            results2_df = pd.DataFrame([{
-                'Row_ID': r.Row_ID,
-                'Match': r.match,
-                'Confidence': r.confidence,
-                'Reason': r.reason,
-            } for r in results2])
-            print(results2)
-            tickets_df_2 = pd.DataFrame(st.session_state.tickets)
-            final_df_2 = pd.merge(
-                tickets_df_2[['Row_ID', 'ProblemDescription', 'Resolution', 'CustomerFeedback']],
-                results2_df,
-                on='Row_ID',
-                how='inner'
-            )
-            st.subheader("Classification Results")
-            st.dataframe(final_df_2)
-            csv = results2_df.to_csv(index=False)
-            st.download_button(
-                "Download Results",
-                csv,
-                "specific_search.csv",
-                "text/csv"
-            )
-            end_time = time.time()
-            st.success(f"Processed {len(results2)} tickets in {end_time - start_time:.2f} seconds")
+
+        search_button_disabled = st.session_state.usage_count >= max_attempts
+        if st.button("Process Sample Tickets", disabled=search_button_disabled, on_click=increment_counter) and issue_description:
+            if st.session_state.button_clicked:
+                st.session_state.button_clicked = False
+                start_time = time.time()
+                results2 = process_tickets(tickets,2,issue_description,example_phrases)
+                print(results2)
+                results2_df = pd.DataFrame([{
+                    'Row_ID': r.Row_ID,
+                    'Match': r.match,
+                    'Confidence': r.confidence,
+                    'Reason': r.reason,
+                } for r in results2])
+                print(results2)
+                tickets_df_2 = pd.DataFrame(st.session_state.tickets)
+                final_df_2 = pd.merge(
+                    tickets_df_2[['Row_ID', 'ProblemDescription', 'Resolution', 'CustomerFeedback']],
+                    results2_df,
+                    on='Row_ID',
+                    how='inner'
+                )
+                st.subheader("Classification Results")
+                st.dataframe(final_df_2)
+                csv = results2_df.to_csv(index=False)
+                st.download_button(
+                    "Download Results",
+                    csv,
+                    "specific_search.csv",
+                    "text/csv"
+                )
+                end_time = time.time()
+                st.success(f"Processed {len(results2)} tickets in {end_time - start_time:.2f} seconds")
+        if st.session_state.usage_count >= max_attempts:
+            st.error("You have reached the maximum number of attempts (2) for this session. Please refresh the page to start a new session.")
+        elif st.session_state.usage_count > 0:
+            st.info(f"You have {remaining_attempts} attempt(s) remaining for this session.")
+    
 
 if __name__ == "__main__":
     create_streamlit_app()
