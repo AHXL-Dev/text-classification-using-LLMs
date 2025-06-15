@@ -130,17 +130,17 @@ class TicketClassification(BaseModel):
     Row_ID: int
 
 def initialize_client():
-    if 'client' not in st.session_state:
-        st.session_state.client = instructor.patch(
-            OpenAI(
-                base_url="https://openrouter.ai/api/v1",
-                #base_url="http://localhost:11434/v1",
-                #api_key="ollama"
-                api_key=st.secrets["openrouter"]["api_key"]
-            ),
-            mode=instructor.Mode.JSON)
-    if 'usage_count' not in st.session_state:
-        st.session_state.usage_count = 0
+    client = instructor.from_openai(
+        OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            #base_url="http://localhost:11434/v1",
+            #api_key="ollama"
+            api_key=API_KEY
+        ),
+        mode=instructor.Mode.OPENROUTER_STRUCTURED_OUTPUTS
+    )
+
+
         
 def classify_single_ticket(ticket: Dict) -> TicketClassification:
         for attempt in range(3):
@@ -163,12 +163,16 @@ def classify_single_ticket(ticket: Dict) -> TicketClassification:
                 f"3. Compare the initial request (ProblemDescription) with the resolution provided and USE THIS AS CONTEXT\n"
                 f"4. Provide classification that reflects one or more of the following categories that best describe the customer's feedback. If multiple categories apply, please list them all (separate categories with commas):\n\n"
             )
+            
                 result = st.session_state.client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,
-                    response_model=TicketClassification
+                    response_model=TicketClassification,
+                    extra_body={"provider": {"require_parameters": True}}
                 )
+                
+                
                 return result
         
             except Exception as e:
@@ -216,7 +220,8 @@ def analyze_ticket(ticket: Dict, search_criteria: str, example_phrases: str) -> 
                     model=MODEL_NAME,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,
-                    response_model=SearchAnalysis
+                    response_model=SearchAnalysis,
+                    extra_body={"provider": {"require_parameters": True}}
                 )
                 print(result_custom)
                 return result_custom
