@@ -11,19 +11,23 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
+
+
+# Path to your secrets.toml file
+
 if "client" not in st.session_state:
     st.session_state.client = instructor.from_openai(
         OpenAI(
             #base_url="http://localhost:11434/v1",
             base_url="https://openrouter.ai/api/v1/",
             #api_key="ollama"
-            api_key=st.secrets["openrouter"]["api_key"]
+            api_key= st.secrets["openrouter"]["api_key"]
         ),
-        mode=instructor.Mode.OPENROUTER_STRUCTURED_OUTPUTS
+        mode=instructor.Mode.JSON
     )
 
 #MODEL_NAME = "llama3.1:8b"
-MODEL_NAME = "mistralai/mistral-small-3.1-24b-instruct-2503"
+MODEL_NAME = "mistralai/mistral-small-3.1-24b-instruct"
 
 if 'button_clicked' not in st.session_state:
     st.session_state.button_clicked = False
@@ -67,6 +71,7 @@ def create_sample_data():
             "Resolution": "Here’s a link to the bonus calculation guidelines.",
             "CustomerFeedback": "I wasn’t contacted and got a generic response with no specifics."
         },
+    
         {
             "Row_ID": 2,
             "ProblemDescription": "Why is my ticket cost higher than usual?",
@@ -120,7 +125,8 @@ def create_sample_data():
             "ProblemDescription": "I need help with changing my flight date.",
             "Resolution": "Here’s the link to change your booking online.",
             "CustomerFeedback": "The website process was unclear and I couldn’t change my flight."
-        }]
+        }
+    ]
     
     return sample_data
     
@@ -167,6 +173,7 @@ def classify_single_ticket(ticket: Dict) -> TicketClassification:
                 f"2. YOU MUST USE THE {CATEGORY_DEFINITIONS} to guide your classification. CONSIDER THESE CAREFULLY AND ADHERE TO THE DEFINITIONS WHEN CLASSIFYING.\n" 
                 f"3. Compare the initial request (ProblemDescription) with the resolution provided and USE THIS AS CONTEXT\n"
                 f"4. Provide classification that reflects one or more of the following categories that best describe the customer's feedback. If multiple categories apply, please list them all (separate categories with commas):\n\n"
+                f"5. Make sure that what is passed back is a valid JSON format"
             )
             
                 result = st.session_state.client.chat.completions.create(
@@ -174,7 +181,6 @@ def classify_single_ticket(ticket: Dict) -> TicketClassification:
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,
                     response_model=TicketClassification,
-                    extra_body={"provider": {"require_parameters": True}}
                 )
                 
                 
@@ -226,7 +232,6 @@ def analyze_ticket(ticket: Dict, search_criteria: str, example_phrases: str) -> 
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,
                     response_model=SearchAnalysis,
-                    extra_body={"provider": {"require_parameters": True}}
                 )
                 print(result_custom)
                 return result_custom
