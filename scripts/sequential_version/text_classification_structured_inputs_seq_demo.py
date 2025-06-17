@@ -14,7 +14,8 @@ logging.basicConfig(level=logging.INFO)
 if "client" not in st.session_state:
     st.session_state.client = instructor.from_openai(
         OpenAI(
-            base_url="http://localhost:11434/v1",
+            #base_url="http://localhost:11434/v1",
+            base_url="https://openrouter.ai/api/v1/",
             #api_key="ollama"
             api_key=st.secrets["openrouter"]["api_key"]
         ),
