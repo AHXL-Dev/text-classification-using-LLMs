@@ -135,7 +135,7 @@ def initialize_client():
             base_url="https://openrouter.ai/api/v1",
             #base_url="http://localhost:11434/v1",
             #api_key="ollama"
-            api_key=API_KEY
+            api_key=st.secrets["openrouter"]["api_key"]
         ),
         mode=instructor.Mode.OPENROUTER_STRUCTURED_OUTPUTS
     )
