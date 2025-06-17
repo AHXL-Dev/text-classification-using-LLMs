@@ -11,19 +11,32 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
+if "client" not in st.session_state:
+    st.session_state.client = instructor.from_openai(
+        OpenAI(
+            base_url="http://localhost:11434/v1",
+            #api_key="ollama"
+            api_key=st.secrets["openrouter"]["api_key"]
+        ),
+        mode=instructor.Mode.JSON
+    )
 
-
+#MODEL_NAME = "llama3.1:8b"
+MODEL_NAME = "mistralai/mistral-small-24b-instruct-2501:free"
 
 if 'button_clicked' not in st.session_state:
     st.session_state.button_clicked = False
+    
+if 'usage_count' not in st.session_state: 
+    st.session_state.usage_count = 0
     
 def increment_counter():
     st.session_state.usage_count += 1
     st.session_state.button_clicked = True
 
 
-#MODEL_NAME = "mistral:latest"
-MODEL_NAME = "mistralai/mistral-small-24b-instruct-2501:free"
+
+
 
 LABELS = Literal['TIME_WAITING', 'POLICY', 'SERVICE_PROCESS', 
                 'QUALITY_OF_RESOLUTION', 'SELF_HELP_RESOURCES','AGENT_MANNERS', 
@@ -129,16 +142,7 @@ class TicketClassification(BaseModel):
     confidence: float = Field(ge=0, le=1, description='How confident are you in this classification (0-1)')
     Row_ID: int
 
-def initialize_client():
-    client = instructor.from_openai(
-        OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            #base_url="http://localhost:11434/v1",
-            #api_key="ollama"
-            api_key=st.secrets["openrouter"]["api_key"]
-        ),
-        mode=instructor.Mode.OPENROUTER_STRUCTURED_OUTPUTS
-    )
+
 
 
         
@@ -162,6 +166,7 @@ def classify_single_ticket(ticket: Dict) -> TicketClassification:
                 f"2. YOU MUST USE THE {CATEGORY_DEFINITIONS} to guide your classification. CONSIDER THESE CAREFULLY AND ADHERE TO THE DEFINITIONS WHEN CLASSIFYING.\n" 
                 f"3. Compare the initial request (ProblemDescription) with the resolution provided and USE THIS AS CONTEXT\n"
                 f"4. Provide classification that reflects one or more of the following categories that best describe the customer's feedback. If multiple categories apply, please list them all (separate categories with commas):\n\n"
+                f"5. you MUST return a valid JSON format"
             )
             
                 result = st.session_state.client.chat.completions.create(
@@ -262,7 +267,7 @@ def create_streamlit_app():
     st.set_page_config(layout="wide")
     st.sidebar.header("Navigation")
     page = st.sidebar.radio("Select Page", ["Introduction", "Process Tickets", "Search for theme"])
-    initialize_client()
+
     
 
     st.sidebar.divider()
