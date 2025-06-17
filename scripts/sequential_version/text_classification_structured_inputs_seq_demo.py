@@ -19,11 +19,11 @@ if "client" not in st.session_state:
             #api_key="ollama"
             api_key=st.secrets["openrouter"]["api_key"]
         ),
-        mode=instructor.Mode.JSON
+        mode=instructor.Mode.OPENROUTER_STRUCTURED_OUTPUTS
     )
 
 #MODEL_NAME = "llama3.1:8b"
-MODEL_NAME = "mistralai/mistral-small-24b-instruct-2501:free"
+MODEL_NAME = "mistralai/mistral-small-3.1-24b-instruct-2503"
 
 if 'button_clicked' not in st.session_state:
     st.session_state.button_clicked = False
@@ -167,7 +167,6 @@ def classify_single_ticket(ticket: Dict) -> TicketClassification:
                 f"2. YOU MUST USE THE {CATEGORY_DEFINITIONS} to guide your classification. CONSIDER THESE CAREFULLY AND ADHERE TO THE DEFINITIONS WHEN CLASSIFYING.\n" 
                 f"3. Compare the initial request (ProblemDescription) with the resolution provided and USE THIS AS CONTEXT\n"
                 f"4. Provide classification that reflects one or more of the following categories that best describe the customer's feedback. If multiple categories apply, please list them all (separate categories with commas):\n\n"
-                f"5. you MUST return a valid JSON format"
             )
             
                 result = st.session_state.client.chat.completions.create(
