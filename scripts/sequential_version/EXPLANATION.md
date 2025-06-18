@@ -13,22 +13,7 @@ This connection allows the app to interact with various language models via the 
 
 ## High-level FlowChart
 
-flowchart TD
-    A[User starts Streamlit session] --> B{Check LLM client in session_state}
-    B -- Exists --> C[Use existing LLM client]
-    B -- Not exists --> D[Create LLM client connection<br>to OpenRouter API via Instructor + OpenAI wrapper]
-    C & D --> E[ticket data read for classification]
-    E --> F[Construct prompt with:<br>- ProblemDescription<br>- Resolution<br>- CustomerFeedback<br>- Classification rules]
-    F --> G[Send prompt to LLM via Chat Completions API]
-    G --> H[Receive JSON response<br>validated by Pydantic]
-    H --> I{Classification success?}
-    I -- No --> J[Retry up to 3 times]
-    J --> I
-    I -- Yes --> K[Return classification object]
-    K -- > Proceed to next row
-    L --> L[Join classification with original data]
-    M --> M[Display results in Streamlit app]
-
+![Text Classification Flowchart](flowchart.png)
 
 
 
@@ -83,6 +68,7 @@ Each label is carefully defined to ensure the LLM understands the classification
 
 I created a synthetic dataset based on customer feedback for a flight, generated with ChatGPT. The structure mimics typical ticketing management systems. Example:
 
+
 ```json
 {
   "Row_ID": 10,
@@ -90,6 +76,7 @@ I created a synthetic dataset based on customer feedback for a flight, generated
   "Resolution": "Here’s the link to change your booking online.",
   "CustomerFeedback": "The website process was unclear and I couldn’t change my flight."
 }
+```
 ---
 
 ## 🏗 Pydantic Classes
